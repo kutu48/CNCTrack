@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#d4af37"/>
+<link rel="manifest" href="manifest.json"/>
+<title>CNC Template Tracker</title>
+<link rel="stylesheet" href="css/app.css"/>
+</head>
+<body>
+
+<!-- Offline banner -->
+<div class="offline-banner hidden" id="offlineBanner">📡 OFFLINE — aksi tersimpan lokal, akan tersinkron saat online</div>
+
+<!-- Header -->
+<header class="no-print">
+  <div class="app-head">
+    <div class="brand">
+      <h1>CNC Template Tracker</h1>
+      <div class="brand-tools">
+        <span id="headerLastSync">Last sync: -</span>
+        <span class="sync-badge hidden" id="outboxBadge">⏳ <span id="outboxCount">0</span> pending</span>
+      </div>
+    </div>
+    <div class="sync-head">
+      <div id="headerSyncStatus">PWA · belum login</div>
+      <div id="whoami"></div>
+      <button class="small bad hidden" id="btnLogout" onclick="App.logout()">Logout</button>
+    </div>
+  </div>
+</header>
+
+<!-- Login Page -->
+<section class="wrap" id="page-login">
+  <div class="card" style="max-width:520px;margin:34px auto">
+    <h2>Login</h2>
+    <label>Username</label><input id="loginUser" autocomplete="username"/>
+    <label>Password</label><input id="loginPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')App.login()"/>
+    <div class="actions"><button class="good" onclick="App.login()">Masuk</button></div>
+    <div class="actions"><button onclick="App.ping()">Cek Koneksi API</button></div>
+    <div class="scan-status" id="loginStatus"></div>
+    <div class="scan-status" id="loginStatus"></div>
+  </div>
+</section>
+
+<!-- Main App -->
+<main class="wrap hidden" id="app">
+  <div class="spacer" style="height:6px"></div>
+
+  <!-- HOME -->
+  <section class="page" id="page-home">
+    <div class="home-hero">
+      <h2>Dashboard Template CNC</h2>
+      <div class="muted">Offline-first PWA — seluruh aksi tulis bisa dilakukan tanpa internet.</div>
+      <div class="summary-box">
+        <div class="mini"><b id="sumBuyers">0</b><span>Total Buyer</span></div>
+        <div class="mini"><b id="sumTemplates">0</b><span>Total Template</span></div>
+        <div class="mini"><b id="sumWaiting">0</b><span>Pending Distribute</span></div>
+      </div>
+    </div>
+    <div class="menu-grid" id="menuGrid">
+      <!-- Menu cards populated by renderHome() based on role -->
+    </div>
+    <div class="card">
+      <h3>🕘 Movement Terakhir</h3>
+      <div id="recentMovements"></div>
+    </div>
+  </section>
+
+  <!-- INPUT TEMPLATE -->
+  <section class="page hidden" id="page-templateInput">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2 id="inputTitle">Input Template Baru</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <label>Buyer</label><input id="inpBuyer" placeholder="PUMA"/>
+      <label>Style / KP</label><input id="inpStyle" placeholder="KP-123"/>
+      <label>Part Template</label>
+      <div class="part-head"><span>Nama Part</span><span>Size</span><span>Qty</span><span>Uk Pet Board</span><span></span></div>
+      <div id="partRows"></div>
+      <div class="actions"><button onclick="App.addPartRow()">+ Tambah Part</button></div>
+      <label>Upload Sketch (bisa lebih dari 1)</label>
+      <div class="muted" style="font-size:12px;margin-bottom:6px">📷 Pilih file, atau <b>Ctrl+V</b> untuk paste dari PrintScreen. Gambar akan otomatis masuk ke mode Crop.</div>
+      <input accept="image/*" capture="environment" id="sketchFile" type="file" onchange="App.onSketchFile(this)"/>
+      <div class="sketch-gallery" id="sketchGallery"></div>
+      <div class="actions"><button class="good" id="btnSaveTemplate" onclick="App.saveTemplate()">Simpan Template</button><button onclick="App.clearForm()">Clear</button></div>
+    </div>
+  </section>
+
+  <!-- DISTRIBUTION -->
+  <section class="page hidden" id="page-distribution">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>Distribusi Template</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="muted">Template dengan status <b>WAITING_DISTRIBUTION</b> muncul di sini.</div>
+      <input id="distSearch" oninput="App.renderDistribution()" placeholder="Cari template waiting..."/>
+      <div class="actions"><button class="small" onclick="App.syncData('Refresh...',{}).then(()=>App.renderDistribution())">🔄 Refresh</button></div>
+      <div id="distList"></div>
+      <div id="distSplitBox" class="dist-split-box hidden"></div>
+      <label>Tujuan Storage</label><select id="distStorage"></select>
+      <label>Catatan</label><textarea id="distNote" placeholder="Opsional"></textarea>
+      <div class="actions"><button class="good" onclick="App.doDistribute()">Distribusikan</button></div>
+    </div>
+  </section>
+
+  <!-- TEMPLATE LIST -->
+  <section class="page hidden" id="page-templateList">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>List Semua Template</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="row">
+        <div><label>Cari</label><input id="tplSearch" oninput="App.renderTemplateList()" placeholder="Buyer / Style / Part / ID"/></div>
+        <div><label>Status</label><select id="tplStatus" onchange="App.renderTemplateList()"><option value="">Semua</option><option value="WAITING_DISTRIBUTION">Menunggu</option><option value="DISTRIBUTED">Distribusi</option><option value="OUT">Keluar</option></select></div>
+      </div>
+      <div id="tplList"></div>
+    </div>
+  </section>
+
+  <!-- MOVEMENT -->
+  <section class="page hidden" id="page-movement">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>Movement Template</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <label>Dari Storage</label><select id="moveFrom" onchange="App.renderMoveTemplates()"></select>
+      <label>Pilih Template</label><div id="moveList"></div>
+      <div class="row">
+        <div><label>Jenis</label><select id="moveType"><option value="TRANSFER">Transfer</option><option value="REPAIR">Repair</option><option value="RETURN">Return</option><option value="OUT">Keluar</option></select></div>
+        <div><label>Tujuan</label><select id="moveTo"></select></div>
+      </div>
+      <label>Catatan</label><textarea id="moveNote"></textarea>
+      <div class="actions"><button class="good" onclick="App.doMove()">Simpan Movement</button></div>
+    </div>
+  </section>
+
+  <!-- MOVEMENT HISTORY -->
+  <section class="page hidden" id="page-movementHistory">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>🕘 History Movement</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="row">
+        <div><label>Dari Tanggal</label><input type="date" id="mhFrom"/></div>
+        <div><label>Sampai</label><input type="date" id="mhTo"/></div>
+      </div>
+      <div class="row">
+        <div><label>Jenis</label><select id="mhType"><option value="">Semua</option><option>DISTRIBUTE</option><option>TRANSFER</option><option>OUT</option><option>IMPORT_EXISTING</option><option>UPDATE_EXISTING</option></select></div>
+        <div><label>Storage</label><select id="mhStorage"><option value="">Semua</option></select></div>
+      </div>
+      <label>Cari</label><input id="mhSearch" oninput="App.renderHistory()" placeholder="Buyer / Style / User..."/>
+      <div class="actions"><button class="good" onclick="App.fetchHistory()">🔍 Cari di Server</button><button onclick="App.renderHistory()">Tampilkan Cache Lokal</button></div>
+      <div id="mhList"></div>
+    </div>
+  </section>
+
+  <!-- PET BOARD -->
+  <section class="page hidden" id="page-petBoard">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>🪧 PET/PVC Board Stock</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="summary-box" id="petSummary"></div>
+      <div class="actions" style="margin-top:8px">
+        <button onclick="App.showPetBoardTab('stock')">📦 Available Stock</button>
+        <button onclick="App.showPetBoardTab('in')">📥 Pet Board In</button>
+        <button onclick="App.showPetBoardTab('master')">⚙️ Master Ukuran</button>
+        <button onclick="App.showPetBoardTab('report')">📊 Report</button>
+      </div>
+      <div id="petTabContent"></div>
+    </div>
+  </section>
+
+  <!-- STORAGE -->
+  <section class="page hidden" id="page-storage">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>Cek Storage</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="row">
+        <div><label>Cari / Scan Storage</label><input id="storageSearch" oninput="App.renderStorage()" placeholder="Ketik kode storage..."/></div>
+        <div style="display:flex;align-items:end;gap:6px">
+          <button class="good small" onclick="App.scanQRStorage()" style="white-space:nowrap">📷 Scan QR</button>
+          <button class="small" onclick="App.openStorageInput()">Buka</button>
+        </div>
+      </div>
+      <div class="grid" id="storageGrid"></div>
+    </div>
+  </section>
+
+  <!-- MASTER STORAGE -->
+  <section class="page hidden" id="page-master">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>Master Storage</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="row">
+        <div><label>Kode</label><input id="stCode" placeholder="CNC-MEJA-03"/></div>
+        <div><label>Nama</label><input id="stName" placeholder="Meja CNC 03"/></div>
+      </div>
+      <label>Area</label><input id="stArea" placeholder="Area CNC"/>
+      <div class="actions"><button class="good" onclick="App.addStorage()">Tambah Storage</button><button class="warn" onclick="App.showPage('printqr')">🖨️ Print QR</button></div>
+      <label>Filter Storage</label>
+      <input id="masterStorageFilter" oninput="App.renderMaster()" placeholder="Cari kode / nama / area..."/>
+      <div id="storageList"></div>
+    </div>
+  </section>
+
+  <!-- UPDATE LAPANGAN -->
+  <section class="page hidden" id="page-fieldUpdate">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>🧾 Update Lapangan per Storage</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="scan-status">Alur cepat: pilih storage → tambah 1/10 template → upload sekali. Cocok untuk opname kondisi aktual di lapangan.</div>
+      <label>Cari Storage</label>
+      <input id="fieldStorageSearch" oninput="App.renderFieldUpdateStorageList()" placeholder="Cari kode/nama storage"/>
+      <label>Storage Terpilih</label>
+      <input id="fieldSelectedStorage" readonly placeholder="Belum pilih storage"/>
+      <div class="grid" id="fieldStorageGrid"></div>
+    </div>
+    <div class="card hidden" id="fieldTemplateFormCard">
+      <h3>Tambah Template ke Storage</h3>
+      <div class="muted" id="fieldStorageTitle">-</div>
+      <div id="fieldTemplateRows"></div>
+      <div class="actions"><button onclick="App.addFieldTemplateRow()">+ Tambah 1 Baris</button><button onclick="App.addFieldTemplateRows(10)">+ Tambah 10 Baris</button><button onclick="App.clearFieldTemplateRows()">Clear</button><button class="good" onclick="App.saveFieldStorageTemplates()">Upload ke Storage</button></div>
+      <div id="fieldUploadPreview"></div>
+    </div>
+  </section>
+
+  <!-- PRINT QR -->
+  <section class="page hidden no-print" id="page-printqr">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>🖨️ Print QR Storage</h2><button class="small" onclick="App.showPage('master')">← Kembali</button></div>
+      <div class="muted">Pilih storage yang ingin di-print QR label-nya.</div>
+      <input id="qrSearch" oninput="App.renderPrintQRSelection()" placeholder="Cari storage..."/>
+      <div class="actions"><button onclick="App.selectAllQR(true)">Pilih Semua</button><button onclick="App.selectAllQR(false)">Clear</button><button class="good" onclick="App.printQR()">🖨️ PDF / Print</button></div>
+      <div id="qrSelection"></div>
+    </div>
+    <div class="qr-print-area hidden" id="qrPrintArea"></div>
+  </section>
+
+  <!-- USER MANAGEMENT -->
+  <section class="page hidden" id="page-userManagement">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>User Management</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="row">
+        <div><label>Username</label><input id="newUser" placeholder="operator01"/></div>
+        <div><label>Password</label><input id="newPass" type="password"/></div>
+      </div>
+      <div class="row">
+        <div><label>Nama</label><input id="newName"/></div>
+        <div><label>Role</label><select id="newRole"><option value="operator">operator</option><option value="admin">admin</option><option value="super_admin">super_admin</option></select></div>
+      </div>
+      <div class="actions"><button class="good" onclick="App.addUser()">Tambah User</button></div>
+      <div id="userList"></div>
+    </div>
+  </section>
+
+  <!-- OUTBOX / SYNC STATUS -->
+  <section class="page hidden" id="page-outboxPanel">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>📤 Sync Status & Outbox</h2><button class="small" onclick="App.showPage('home')">← Home</button></div>
+      <div class="muted">Aksi offline tersimpan di IndexedDB outbox, tersinkron otomatis saat online.</div>
+      <div class="actions"><button class="good" onclick="App.drainOutbox()">Sync Sekarang</button></div>
+      <h3 id="outboxPendingTitle">Antrian Pending</h3>
+      <div id="outboxPendingList"></div>
+      <h3>⚠️ Perlu Ditinjau (Konflik)</h3>
+      <div id="outboxConflictList"></div>
+    </div>
+  </section>
+
+  <div class="spacer-bottom"></div>
+</main>
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav hidden no-print" id="bottomNav">
+  <button data-page="home" onclick="App.showPage('home')">🏠 Home</button>
+  <button data-page="templateInput" data-role="all" onclick="App.showPage('templateInput')">➕ Input</button>
+  <button data-page="distribution" data-role="all" onclick="App.showPage('distribution')">📦 Dist</button>
+  <button data-page="petBoard" data-role="admin" onclick="App.showPage('petBoard')">🪧 Board</button>
+  <button data-page="outboxPanel" data-role="all" onclick="App.showPage('outboxPanel')">📤 Sync</button>
+</nav>
+
+<!-- Crop Modal -->
+<div class="crop-modal hidden" id="cropModal" style="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:140;display:none">
+  <div style="height:100%;display:flex;flex-direction:column;padding:10px;max-width:600px;margin:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;margin-bottom:6px">
+      <h2 style="color:#fff;margin:0">✂️ Crop Sketch</h2>
+      <button class="bad small" onclick="App.closeCropModal(false)">Batal</button>
+    </div>
+    <div class="muted" style="flex:0 0 auto;font-size:12px;margin-bottom:6px;color:#aeb7b1">Geser gambar untuk atur posisi, gunakan slider untuk zoom. Area di dalam kotak akan disimpan.</div>
+    <div class="crop-viewport" id="cropViewport" style="position:relative;flex:1 1 auto;overflow:hidden;background:#05070a;border:2px solid var(--accent);border-radius:16px;min-height:260px;touch-action:none">
+      <img id="cropImage" alt="Crop" style="position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;will-change:transform"/>
+      <div class="crop-grid" style="position:absolute;inset:0;pointer-events:none"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex:0 0 auto;margin-top:8px">
+      <span style="color:#fff">➖</span>
+      <input type="range" id="cropZoom" min="100" max="400" value="100" oninput="App.setCropZoom(this.value)" style="flex:1;accent-color:var(--accent)"/>
+      <span style="color:#fff">➕</span>
+    </div>
+    <div class="actions" style="flex:0 0 auto">
+      <button class="good" onclick="App.applyCrop()">✔ Pakai Hasil Crop</button>
+      <button onclick="App.resetCrop()">Reset</button>
+      <button class="bad" onclick="App.closeCropModal(false)">Batal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail/Edit Modal -->
+<div class="modal hidden" id="modal" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:50;display:none">
+  <div class="card" id="modalCard" style="max-width:600px;margin:auto;margin-top:5vh;max-height:88vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between"><h2 id="modalTitle">Detail</h2><button class="bad small" onclick="App.closeModal()">Tutup</button></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<div class="loading-overlay hidden" id="busy"><div class="loading-box"><b id="busyTitle">Memproses...</b><div class="bar"><span></span></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="js/qrcode.min.js"></script>
+<script type="module" src="config.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
