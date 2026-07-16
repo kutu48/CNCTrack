@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+    container_name: cnc_tracker_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/app:/app/app
+    environment:
+      - DATABASE_URL=sqlite:///./data/cnc_tracker.db
+      - SECRET_KEY=your_super_secret_key_change_in_production
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: cnc_tracker_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Local DB for petboard specific usage if required
+  local_db:
+    image: mysql:8.0
+    container_name: cnc_tracker_local_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: petboard_local
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
